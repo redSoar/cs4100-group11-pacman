@@ -51,25 +51,37 @@ class Agent:
     
     transitions = random.sample(self.memory, Constants.BATCH_SIZE)
 
-    q_values = []
-    updated_values = []
+    states = []
+    actions = []
+    next_states = []
+    rewards = []
 
     for state, action, next_state, reward in transitions:
-      if next_state is None:
-        continue
-      q_s_a = self.policy_network(state).gather(1, action)
-      current_value_fn = self.target_network(next_state).max(1).values
-      updated_value_fn = reward + Constants.GAMMA * current_value_fn
+      states.append(state)
+      actions.append(action)
+      next_states.append(next_state)
+      rewards.append(reward)
 
-      q_values.append(q_s_a)
-      updated_values.append(updated_value_fn.unsqueeze(1))
-      
-    loss = nn.CrossEntropyLoss()(
-      torch.tensor(q_values, device=self.device, requires_grad=True),
-      torch.tensor(updated_values, device=self.device, requires_grad=True)
-    )
+    states_tensor = torch.cat(states)
+    actions_tensor = torch.cat(actions)
+    next_states_tensor = torch.cat([sprime for sprime in next_states if sprime is not None])
+    rewards_tensor = torch.cat(rewards)
 
+    non_terminal_next_state_indices = torch.tensor(tuple([sprime is not None for sprime in next_states]), device=self.device, dtype=torch.bool)
+
+    next_state_values = torch.zeros(Constants.BATCH_SIZE, device=self.device)
+    with torch.no_grad():
+        next_state_values[non_terminal_next_state_indices] = self.target_network(next_states_tensor).max(1).values
+    
+    q_values = self.policy_network(states_tensor).gather(1, actions_tensor)
+    updated_v_values = rewards_tensor + Constants.GAMMA * next_state_values
+
+    criterion = nn.SmoothL1Loss()
+    loss = criterion(q_values, updated_v_values.unsqueeze(1))
+
+    # Optimize the model
     self.optimizer.zero_grad()
     loss.backward()
+    # In-place gradient clipping
+    torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
     self.optimizer.step()
-    
