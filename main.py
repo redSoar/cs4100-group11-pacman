@@ -5,7 +5,8 @@ import torch
 from itertools import count
 
 # Initialize the environment
-env = gym.make("CartPole-v1", render_mode="human")
+env = gym.make("ALE/Pacman-v5", render_mode="human")
+# env = gym.make("ALE/Pacman-v5")
 device = (
   "cuda"
   if torch.cuda.is_available()
