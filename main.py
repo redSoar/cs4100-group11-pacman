@@ -3,6 +3,7 @@ from constants import Constants
 import gymnasium as gym
 import torch
 from itertools import count
+import os
 
 # Initialize the environment
 env = gym.make("ALE/Pacman-v5", render_mode="human")
@@ -18,6 +19,13 @@ device = (
 # Initialize the agent
 agent = Agent(env, device)
 
+if os.path.exists('models'):
+  print('Loading previous models...')
+  agent.load_models()
+else:
+  print('No previous models found.')
+  os.mkdir('models')
+
 for episode in range(Constants.NUM_EPISODES):
   print(f'Starting episode {episode}')
 
@@ -27,6 +35,10 @@ for episode in range(Constants.NUM_EPISODES):
     dtype=torch.float32,
     device=device
   ).unsqueeze(0)
+
+  if episode % 10 == 0:
+    print('Saving models...')
+    agent.save_models()
 
   for time_step in count():
     action = agent.predict(state)

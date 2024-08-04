@@ -1,10 +1,10 @@
 import torch.nn as nn
 
 class NeuralNetwork(nn.Module):
-  def __init__(self, obs_space_size, action_space_size):
+  def __init__(self, action_space_size):
     super().__init__()
     self.flatten = nn.Flatten()
-    self.linear_relu_stack = nn.Sequential(
+    self.layers = nn.Sequential(
       nn.Conv2d(3, 3, 3),
       nn.ReLU(),
       nn.MaxPool2d(3, 3),
@@ -23,5 +23,5 @@ class NeuralNetwork(nn.Module):
 
   def forward(self, x):
     x = x.transpose(1,3)
-    logits = self.linear_relu_stack(x)
+    logits = self.layers(x)
     return logits
