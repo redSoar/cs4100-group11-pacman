@@ -3,9 +3,11 @@ from constants import Constants
 import gymnasium as gym
 import torch
 from itertools import count
+import json 
+import os
 
 # Initialize the environment
-env = gym.make("ALE/Pacman-v5", render_mode="human")
+env = gym.make("ALE/Pacman-v5", render_mode="rgb_array")
 # env = gym.make("ALE/Pacman-v5")
 device = (
   "cuda"
@@ -17,9 +19,31 @@ device = (
 
 # Initialize the agent
 agent = Agent(env, device)
+data_to_add = {
 
+}
+filename = "reward_data.json"
 for episode in range(Constants.NUM_EPISODES):
   print(f'Starting episode {episode}')
+  print(data_to_add)
+
+  if os.path.exists(filename):
+    with open(filename, 'r') as file:
+        try:
+            data = json.load(file)
+        except json.JSONDecodeError:
+            # If the file is empty or invalid, start with an empty dict
+            print("file is invalid")
+            data = {}
+  else:
+      data = {}
+
+  data = data_to_add
+
+  with open(filename, 'w') as file:
+    json.dump(data, file, indent=4)
+
+  print("Data written to JSON file successfully.")
 
   state, _ = env.reset()
   state = torch.tensor(
@@ -28,9 +52,14 @@ for episode in range(Constants.NUM_EPISODES):
     device=device
   ).unsqueeze(0)
 
+  data_to_add[episode] = {}
+
   for time_step in count():
     action = agent.predict(state)
     observation, reward, terminated, truncated, _ = env.step(action.item())
+
+    data_to_add[episode][time_step] = reward
+
     reward = torch.tensor([reward], device=device)
     done = terminated or truncated
 
