@@ -17,8 +17,8 @@ class Agent:
     self.memory = deque([], maxlen=Constants.MEMORY_CAPACITY)
 
     # Set up networks
-    self.target_network = NeuralNetwork(obs_space_size, action_space_size).to(self.device)
-    self.policy_network = NeuralNetwork(obs_space_size, action_space_size).to(self.device)
+    self.target_network = NeuralNetwork(action_space_size).to(self.device)
+    self.policy_network = NeuralNetwork(action_space_size).to(self.device)
 
     # Copy target network to policy network to start
     self.policy_network.load_state_dict(self.target_network.state_dict())
@@ -85,3 +85,11 @@ class Agent:
     # In-place gradient clipping
     torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
     self.optimizer.step()
+
+  def load_models(self):
+    self.policy_network = torch.load('models/policy.pth')
+    self.target_network = torch.load('models/target.pth')
+
+  def save_models(self):
+    torch.save(self.policy_network, 'models/policy.pth')
+    torch.save(self.target_network, 'models/target.pth')
