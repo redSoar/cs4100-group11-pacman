@@ -23,11 +23,8 @@ data_to_add = {
 
 }
 filename = "reward_data.json"
-for episode in range(Constants.NUM_EPISODES):
-  print(f'Starting episode {episode}')
-  print(data_to_add)
 
-  if os.path.exists(filename):
+if os.path.exists(filename):
     with open(filename, 'r') as file:
         try:
             data = json.load(file)
@@ -35,10 +32,14 @@ for episode in range(Constants.NUM_EPISODES):
             # If the file is empty or invalid, start with an empty dict
             print("file is invalid")
             data = {}
-  else:
-      data = {}
+else:
+    data = {}
 
-  data = data_to_add
+data_to_add = data
+
+for episode in range(Constants.NUM_EPISODES):
+  print(f'Starting episode {episode}')
+  print(data_to_add)
 
   with open(filename, 'w') as file:
     json.dump(data, file, indent=4)
@@ -52,13 +53,16 @@ for episode in range(Constants.NUM_EPISODES):
     device=device
   ).unsqueeze(0)
 
-  data_to_add[episode] = {}
+  if episode != 0:
+     data_to_add[episode] = sum(score)
+
+  score = []
 
   for time_step in count():
     action = agent.predict(state)
     observation, reward, terminated, truncated, _ = env.step(action.item())
 
-    data_to_add[episode][time_step] = reward
+    score.append(reward)
 
     reward = torch.tensor([reward], device=device)
     done = terminated or truncated
