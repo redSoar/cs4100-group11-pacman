@@ -3,7 +3,10 @@ from constants import Constants
 import gymnasium as gym
 import torch
 from itertools import count
+<<<<<<< HEAD
 import json 
+=======
+>>>>>>> main
 import os
 
 # Initialize the environment
@@ -37,6 +40,13 @@ else:
 
 data_to_add = data
 
+if os.path.exists('models'):
+  print('Loading previous models...')
+  agent.load_models()
+else:
+  print('No previous models found.')
+  os.mkdir('models')
+
 for episode in range(Constants.NUM_EPISODES):
   print(f'Starting episode {episode}')
   print(data_to_add)
@@ -53,10 +63,16 @@ for episode in range(Constants.NUM_EPISODES):
     device=device
   ).unsqueeze(0)
 
+<<<<<<< HEAD
   if episode != 0:
      data_to_add[episode] = sum(score)
 
   score = []
+=======
+  if episode % 10 == 0:
+    print('Saving models...')
+    agent.save_models()
+>>>>>>> main
 
   for time_step in count():
     action = agent.predict(state)
