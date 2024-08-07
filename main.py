@@ -1,49 +1,16 @@
-from collections import deque
-
 from agent import Agent
 from constants import Constants
+from frame_wrapper import FrameWrapper
 import gymnasium as gym
-import numpy as np
 import torch
-import matplotlib.pyplot as plt
 from itertools import count
 import json 
 import os
 
-class FrameWrapper(gym.Wrapper):
-  def __init__(self, env, num_frames = 4):
-    super(FrameWrapper, self).__init__(env)
-    self.num_frames = num_frames
-    self.frames = deque(maxlen = self.num_frames)
-    self.average_frame = None
-
-  def reset(self):
-    observation, info = self.env.reset()
-    for i in range(self.num_frames):
-      self.frames.append(observation)
-    self.average_frame = self.frame_averaging()
-    return self.frame_averaging(), info
-
-  def step(self, action):
-    observation, reward, terminated, truncated, info = self.env.step(action)
-    self.frames.append(observation)
-    self.average_frame = self.frame_averaging()
-    return self.frame_averaging(), reward, terminated, truncated, info
-
-  def frame_averaging(self):
-    average_frame = np.mean(np.stack(self.frames), axis=0).astype(np.uint8)
-    return average_frame
-
-def show_frame(frame):
-  plt.figure(figsize=(8,8))
-  plt.imshow(frame)
-  plt.axis('off')
-  plt.show()
-
 # Initialize the environment
-env = gym.make("ALE/Pacman-v5", render_mode="human")
+env = gym.make("ALE/Pacman-v5")
 env = FrameWrapper(env)
-# env = gym.make("ALE/Pacman-v5")
+
 device = (
   "cuda"
   if torch.cuda.is_available()
@@ -54,13 +21,13 @@ device = (
 
 # Initialize the agent
 agent = Agent(env, device)
-data_to_add = {
 
-}
-filename = "reward_data.json"
+# Prepare to save reward data
+data_to_add = {}
+reward_data_filename = "reward_data.json"
 
-if os.path.exists(filename):
-    with open(filename, 'r') as file:
+if os.path.exists(reward_data_filename):
+    with open(reward_data_filename, 'r') as file:
         try:
             data = json.load(file)
         except json.JSONDecodeError:
@@ -72,6 +39,7 @@ else:
 
 data_to_add = data
 
+# Load model parameters, if present
 if os.path.exists('models'):
   print('Loading previous models...')
   agent.load_models()
@@ -79,14 +47,12 @@ else:
   print('No previous models found.')
   os.mkdir('models')
 
+# Reinforcement learning episode loop
 for episode in range(Constants.NUM_EPISODES):
   print(f'Starting episode {episode}')
-  print(data_to_add)
 
-  with open(filename, 'w') as file:
+  with open(reward_data_filename, 'w') as file:
     json.dump(data, file, indent=4)
-
-  print("Data written to JSON file successfully.")
 
   state, _ = env.reset()
   state = torch.tensor(
@@ -98,18 +64,19 @@ for episode in range(Constants.NUM_EPISODES):
   if episode != 0:
      data_to_add[episode] = sum(score)
 
-  score = []
   if episode % 10 == 0:
     print('Saving models...')
     agent.save_models()
 
+  score = []
   for time_step in count():
     action = agent.predict(state)
     observation, reward, terminated, truncated, _ = env.step(action.item())
 
+    # Add integer reward from this step to the reward list
     score.append(reward)
 
-    reward = torch.tensor([reward], device=device)
+    reward_tensor = torch.tensor([reward], device=device)
     done = terminated or truncated
 
     if terminated:
@@ -118,7 +85,7 @@ for episode in range(Constants.NUM_EPISODES):
       next_state = torch.tensor(observation, dtype=torch.float32, device=device).unsqueeze(0)
 
     # Store the transition in memory
-    agent.memory.append((state, action, next_state, reward))
+    agent.memory.append((state, action, next_state, reward_tensor))
 
     # Move to the next state
     state = next_state
@@ -126,15 +93,13 @@ for episode in range(Constants.NUM_EPISODES):
     # Perform one step of the optimization (on the policy network)
     agent.optimize_model()
 
-    # Soft update of the target network's weights
-    # θ′ ← τ θ + (1 −τ )θ′
+    # Partial update of target network
     target_net_state_dict = agent.target_network.state_dict()
     policy_net_state_dict = agent.policy_network.state_dict()
     for key in policy_net_state_dict:
-        target_net_state_dict[key] = policy_net_state_dict[key]*Constants.TAU + target_net_state_dict[key]*(1-Constants.TAU)
+        target_net_state_dict[key] = policy_net_state_dict[key] * Constants.TAU + target_net_state_dict[key] * (1 - Constants.TAU)
+    
     agent.target_network.load_state_dict(target_net_state_dict)
 
     if done:
       break
-
-  show_frame(env.average_frame)

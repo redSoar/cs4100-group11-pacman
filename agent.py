@@ -8,7 +8,6 @@ import random
 class Agent:
   def __init__(self, env, device):
     self.env = env
-    obs_space_size = env.observation_space.shape[0]
     action_space_size = env.action_space.n
 
     self.device = device
@@ -67,13 +66,18 @@ class Agent:
     next_states_tensor = torch.cat([sprime for sprime in next_states if sprime is not None])
     rewards_tensor = torch.cat(rewards)
 
+    # Keep track of which states result in a terminal state.
+    # These should not contribute to the V_opt used in the update of the Q value
     non_terminal_next_state_indices = torch.tensor(tuple([sprime is not None for sprime in next_states]), device=self.device, dtype=torch.bool)
 
     next_state_values = torch.zeros(Constants.BATCH_SIZE, device=self.device)
     with torch.no_grad():
         next_state_values[non_terminal_next_state_indices] = self.target_network(next_states_tensor).max(1).values
     
+    # Pass states to the network together, to generate gradient values
     q_values = self.policy_network(states_tensor).gather(1, actions_tensor)
+
+    # Update Q value
     updated_v_values = rewards_tensor + Constants.GAMMA * next_state_values
 
     criterion = nn.SmoothL1Loss()
@@ -82,7 +86,8 @@ class Agent:
     # Optimize the model
     self.optimizer.zero_grad()
     loss.backward()
-    # In-place gradient clipping
+
+    # Clip gradients
     torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
     self.optimizer.step()
 
