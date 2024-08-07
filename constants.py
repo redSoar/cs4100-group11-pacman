@@ -7,4 +7,4 @@ class Constants:
   BATCH_SIZE = 128
   GAMMA = 0.95
   TAU = 0.01
-  NUM_EPISODES = 1000
+  NUM_EPISODES = 10000
