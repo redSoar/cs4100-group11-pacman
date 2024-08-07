@@ -7,6 +7,7 @@ import numpy as np
 import torch
 import matplotlib.pyplot as plt
 from itertools import count
+import json 
 import os
 
 class FrameWrapper(gym.Wrapper):
@@ -53,6 +54,23 @@ device = (
 
 # Initialize the agent
 agent = Agent(env, device)
+data_to_add = {
+
+}
+filename = "reward_data.json"
+
+if os.path.exists(filename):
+    with open(filename, 'r') as file:
+        try:
+            data = json.load(file)
+        except json.JSONDecodeError:
+            # If the file is empty or invalid, start with an empty dict
+            print("file is invalid")
+            data = {}
+else:
+    data = {}
+
+data_to_add = data
 
 if os.path.exists('models'):
   print('Loading previous models...')
@@ -63,6 +81,12 @@ else:
 
 for episode in range(Constants.NUM_EPISODES):
   print(f'Starting episode {episode}')
+  print(data_to_add)
+
+  with open(filename, 'w') as file:
+    json.dump(data, file, indent=4)
+
+  print("Data written to JSON file successfully.")
 
   state, _ = env.reset()
   state = torch.tensor(
@@ -71,6 +95,10 @@ for episode in range(Constants.NUM_EPISODES):
     device=device
   ).unsqueeze(0)
 
+  if episode != 0:
+     data_to_add[episode] = sum(score)
+
+  score = []
   if episode % 10 == 0:
     print('Saving models...')
     agent.save_models()
@@ -78,6 +106,9 @@ for episode in range(Constants.NUM_EPISODES):
   for time_step in count():
     action = agent.predict(state)
     observation, reward, terminated, truncated, _ = env.step(action.item())
+
+    score.append(reward)
+
     reward = torch.tensor([reward], device=device)
     done = terminated or truncated
 
