@@ -1,13 +1,48 @@
+from collections import deque
+
 from agent import Agent
 from constants import Constants
 import gymnasium as gym
+import numpy as np
 import torch
+import matplotlib.pyplot as plt
 from itertools import count
 import json 
 import os
 
+class FrameWrapper(gym.Wrapper):
+  def __init__(self, env, num_frames = 4):
+    super(FrameWrapper, self).__init__(env)
+    self.num_frames = num_frames
+    self.frames = deque(maxlen = self.num_frames)
+    self.average_frame = None
+
+  def reset(self):
+    observation, info = self.env.reset()
+    for i in range(self.num_frames):
+      self.frames.append(observation)
+    self.average_frame = self.frame_averaging()
+    return self.frame_averaging(), info
+
+  def step(self, action):
+    observation, reward, terminated, truncated, info = self.env.step(action)
+    self.frames.append(observation)
+    self.average_frame = self.frame_averaging()
+    return self.frame_averaging(), reward, terminated, truncated, info
+
+  def frame_averaging(self):
+    average_frame = np.mean(np.stack(self.frames), axis=0).astype(np.uint8)
+    return average_frame
+
+def show_frame(frame):
+  plt.figure(figsize=(8,8))
+  plt.imshow(frame)
+  plt.axis('off')
+  plt.show()
+
 # Initialize the environment
-env = gym.make("ALE/Pacman-v5", render_mode="rgb_array")
+env = gym.make("ALE/Pacman-v5", render_mode="human")
+env = FrameWrapper(env)
 # env = gym.make("ALE/Pacman-v5")
 device = (
   "cuda"
@@ -101,3 +136,5 @@ for episode in range(Constants.NUM_EPISODES):
 
     if done:
       break
+
+  show_frame(env.average_frame)
