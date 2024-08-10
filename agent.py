@@ -6,12 +6,14 @@ from collections import deque
 import random
 
 class Agent:
-  def __init__(self, env, device):
+  def __init__(self, env, device, train):
     self.env = env
     action_space_size = env.action_space.n
 
     self.device = device
     print(f"Using {self.device} device")
+
+    self.train = train
 
     self.memory = deque([], maxlen=Constants.MEMORY_CAPACITY)
 
@@ -31,9 +33,7 @@ class Agent:
     self.epsilon = Constants.EPSILON_MAX
 
   def predict(self, state):
-    self.epsilon = max(self.epsilon * Constants.EPSILON_DECAY, Constants.EPSILON_MIN)
-
-    if random.random() < self.epsilon:
+    if self.train and random.random() < self.epsilon:
       # Perform random action
       return torch.tensor(
         [[self.env.action_space.sample()]],
@@ -43,9 +43,18 @@ class Agent:
     else:
       # Perform best action using the policy network
       return self.policy_network(state).max(1).indices.view(1, 1)
+    
+  def update_parameters(self):
+    self.epsilon = max(self.epsilon * Constants.EPSILON_DECAY, Constants.EPSILON_MIN)
+    # Partial update of target network
+    target_net_state_dict = self.target_network.state_dict()
+    policy_net_state_dict = self.policy_network.state_dict()
+    for key in policy_net_state_dict:
+        target_net_state_dict[key] = policy_net_state_dict[key] * Constants.TAU + target_net_state_dict[key] * (1 - Constants.TAU)
+    self.target_network.load_state_dict(target_net_state_dict)
 
   def optimize_model(self):
-    if len(self.memory) < Constants.BATCH_SIZE:
+    if not self.train or len(self.memory) < Constants.BATCH_SIZE:
         return
     
     transitions = random.sample(self.memory, Constants.BATCH_SIZE)
@@ -88,7 +97,7 @@ class Agent:
     loss.backward()
 
     # Clip gradients
-    torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 100)
+    torch.nn.utils.clip_grad_value_(self.policy_network.parameters(), 10)
     self.optimizer.step()
 
   def load_models(self):
