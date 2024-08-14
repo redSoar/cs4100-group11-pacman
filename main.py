@@ -3,6 +3,7 @@ from constants import Constants
 from frame_wrapper import FrameWrapper
 import gymnasium as gym
 import torch
+import matplotlib.pyplot as plt
 from itertools import count
 import json 
 import os
@@ -11,6 +12,12 @@ import os
 train = False
 env = gym.make("ALE/Pacman-v5", render_mode="rgb_array" if train else "human")
 env = FrameWrapper(env)
+
+# visualizes one state of the environment as the network sees it (all entities are visible)
+def show_frame(image):
+  plt.imshow(image)
+  plt.axis('off')
+  plt.savefig('figure.png', bbox_inches='tight', pad_inches=0)
 
 device = (
   "cuda"
@@ -104,3 +111,6 @@ for episode in range(Constants.NUM_EPISODES):
 
   if train:
     agent.update_parameters()
+
+  # used to generate a figure showcasing the frame averaging for testing purposes
+  # show_frame(env.average_frame)
