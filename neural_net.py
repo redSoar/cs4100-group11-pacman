@@ -1,6 +1,8 @@
 import torch.nn as nn
 
+# neural network for our pacman game
 class NeuralNetwork(nn.Module):
+  # initializes the dimensions of the environment as well as the structure of the network
   def __init__(self, action_space_size):
     super().__init__()
     self.flatten = nn.Flatten()
